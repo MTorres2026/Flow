@@ -1,0 +1,192 @@
+{
+  "PEDIDOS": [
+    {
+      "pedido": "0428218",
+      "fechaPedido": "2026-07-30",
+      "completitud": "PARCIAL",
+      "fuenteDocumento": "pedido 0428218.csv",
+      "lineas": [
+        {
+          "idConway": "310099",
+          "producto": "MAIZ MUSHROOM POP N ROLL",
+          "cantidad": 6,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "273388",
+          "producto": "SACO MAIZ 10KG",
+          "cantidad": 35,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "402391",
+          "producto": "ACEITE GIRASOL 3*5LT",
+          "cantidad": 6,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "221619",
+          "producto": "GLAZE POP CARAMELO",
+          "cantidad": 6,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "347885",
+          "producto": "CHEDDAR SEASONING 1KG",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "234679",
+          "producto": "DORITOS TEX MEX 20*140GR",
+          "cantidad": 4,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "222062",
+          "producto": "VASO DPE 44 15X35 NL 1LT",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "373212",
+          "producto": "VASO DPE32 10X62 75/1025C",
+          "cantidad": 3,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "980102",
+          "producto": "PALOMITERO 260 OZ GRAN",
+          "cantidad": 1,
+          "unidad": "CAJA"
+        }
+      ]
+    },
+    {
+      "pedido": "0464361",
+      "fechaPedido": "2026-08-14",
+      "completitud": "PARCIAL",
+      "fuenteDocumento": "pedido 0464361.csv",
+      "lineas": [
+        {
+          "idConway": "310099",
+          "producto": "MAIZ MUSHROOM POP N ROLL",
+          "cantidad": 5,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "273388",
+          "producto": "SACO MAIZ 10KG",
+          "cantidad": 20,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "402391",
+          "producto": "ACEITE GIRASOL 3*5LT",
+          "cantidad": 3,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "221619",
+          "producto": "GLAZE POP CARAMELO",
+          "cantidad": 4,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "347885",
+          "producto": "CHEDDAR SEASONING 1KG",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "234679",
+          "producto": "DORITOS TEX MEX 20*140GR",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "420302",
+          "producto": "RISI GUSANITOS",
+          "cantidad": 6,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "980102",
+          "producto": "PALOMITERO 260 OZ GRAN",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        }
+      ]
+    },
+    {
+      "pedido": "SP001-0000431845",
+      "fechaPedido": "2026-07-15",
+      "completitud": "PARCIAL",
+      "fuenteDocumento": "SP001_0000431845_25025014_CONWAY-THE CONVENIENCE COMPANY SA.PDF",
+      "lineas": [
+        {
+          "idConway": "310099",
+          "producto": "MAIZ MUSHROOM POP N ROLL",
+          "cantidad": 5,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "273388",
+          "producto": "SACO MAIZ 10KG",
+          "cantidad": 20,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "448824",
+          "producto": "ESTUCHE EXTRA GRANDE XXL",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "402391",
+          "producto": "ACEITE GIRASOL 3*5LT",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        }
+      ]
+    },
+    {
+      "pedido": "SP001-0000432350",
+      "fechaPedido": "2026-07-23",
+      "completitud": "PARCIAL",
+      "fuenteDocumento": "SP001_0000432350_25025014_CONWAY-THE CONVENIENCE COMPANY SA.PDF",
+      "lineas": [
+        {
+          "idConway": "273388",
+          "producto": "SACO MAIZ 10KG",
+          "cantidad": 35,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "402391",
+          "producto": "ACEITE GIRASOL 3*5LT",
+          "cantidad": 5,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "448824",
+          "producto": "ESTUCHE EXTRA GRANDE XXL",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "980102",
+          "producto": "PALOMITERO 260 OZ GRAN",
+          "cantidad": 2,
+          "unidad": "CAJA"
+        },
+        {
+          "idConway": "234679",
+          "producto": "DORITOS TEX MEX 20*140GR",
+          "cantidad": 3,
+          "unidad": "CAJA"
+        }
+      ]
+    }
+  ]
+}

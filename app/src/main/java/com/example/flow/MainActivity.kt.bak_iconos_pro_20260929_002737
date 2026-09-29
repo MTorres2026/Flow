@@ -1,0 +1,3984 @@
+package com.example.flow
+
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
+import android.net.Uri
+import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
+import android.os.ParcelFileDescriptor
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.example.flow.ui.theme.FlowTheme
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.math.BigDecimal
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.Canvas
+import androidx.compose.material3.AlertDialog
+
+private const val CINESTOCK_PREFS = "cinestock_prefs"
+private const val CINESTOCK_IP_KEY = "cinestock_server_ip"
+private const val CINESTOCK_PORT_KEY = "cinestock_server_port"
+
+private const val IP_CINESTOCK_POR_DEFECTO = "10.105.241.135"
+private const val PUERTO_CINESTOCK_POR_DEFECTO = 8765
+
+data class ResultadoInformeFlow(
+    val paginas: List<Bitmap>,
+    val numeroPaginas: Int,
+    val textoExtraido: String,
+    val productosFlow: List<ProductoFlow>
+)
+
+class MainActivity : ComponentActivity() {
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        PDFBoxResourceLoader.init(applicationContext)
+
+        FlowHistorial.cargarHistorialInicialDesdeAssets(
+            applicationContext
+        )
+
+        setContent {
+            FlowTheme {
+                FlowHomeScreen()
+            }
+        }
+    }
+}
+
+fun cargarSuperMaestro(
+    context: android.content.Context
+): JSONArray {
+
+    val json =
+        context.assets
+            .open("supermaestro_flow.json")
+            .bufferedReader()
+            .use { it.readText() }
+
+    val raiz =
+        JSONObject(json)
+
+    return raiz.getJSONArray("SUPERMAESTRO")
+}
+
+private val FlowPedidoIcon: ImageVector = ImageVector.Builder(
+    name = "FlowPedidoIcon", defaultWidth = 32.dp, defaultHeight = 32.dp,
+    viewportWidth = 32f, viewportHeight = 32f
+).apply {
+    path(fill = SolidColor(Color.White)) {
+        moveTo(5f, 6f); lineTo(27f, 6f); lineTo(27f, 11f); lineTo(5f, 11f); close()
+        moveTo(7f, 13f); lineTo(29f, 13f); lineTo(29f, 18f); lineTo(7f, 18f); close()
+        moveTo(3f, 20f); lineTo(25f, 20f); lineTo(25f, 25f); lineTo(3f, 25f); close()
+    }
+}.build()
+
+private val FlowManualIcon: ImageVector = ImageVector.Builder(
+    name = "FlowManualIcon", defaultWidth = 32.dp, defaultHeight = 32.dp,
+    viewportWidth = 32f, viewportHeight = 32f
+).apply {
+    path(fill = SolidColor(Color.White)) {
+        moveTo(5f, 6f); lineTo(9f, 6f); lineTo(9f, 10f); lineTo(5f, 10f); close()
+        moveTo(12f, 6f); lineTo(27f, 6f); lineTo(27f, 10f); lineTo(12f, 10f); close()
+        moveTo(5f, 14f); lineTo(9f, 14f); lineTo(9f, 18f); lineTo(5f, 18f); close()
+        moveTo(12f, 14f); lineTo(27f, 14f); lineTo(27f, 18f); lineTo(12f, 18f); close()
+        moveTo(5f, 22f); lineTo(9f, 22f); lineTo(9f, 26f); lineTo(5f, 26f); close()
+        moveTo(12f, 22f); lineTo(23f, 22f); lineTo(23f, 26f); lineTo(12f, 26f); close()
+    }
+}.build()
+
+private val FlowConfigIcon: ImageVector = ImageVector.Builder(
+    name = "FlowConfigIcon", defaultWidth = 32.dp, defaultHeight = 32.dp,
+    viewportWidth = 32f, viewportHeight = 32f
+).apply {
+    path(fill = SolidColor(Color.White)) {
+        moveTo(4f, 6f); lineTo(28f, 6f); lineTo(28f, 9f); lineTo(4f, 9f); close()
+        moveTo(4f, 14f); lineTo(28f, 14f); lineTo(28f, 17f); lineTo(4f, 17f); close()
+        moveTo(4f, 22f); lineTo(28f, 22f); lineTo(28f, 25f); lineTo(4f, 25f); close()
+        moveTo(9f, 3f); lineTo(13f, 3f); lineTo(13f, 12f); lineTo(9f, 12f); close()
+        moveTo(19f, 11f); lineTo(23f, 11f); lineTo(23f, 20f); lineTo(19f, 20f); close()
+        moveTo(11f, 19f); lineTo(15f, 19f); lineTo(15f, 28f); lineTo(11f, 28f); close()
+    }
+}.build()
+
+@Composable
+fun FlowHomeScreen() {
+
+    val context =
+        LocalContext.current
+
+    val scope =
+        rememberCoroutineScope()
+
+    var estado by remember {
+        mutableStateOf(
+            "Todavía no se ha cargado ningún informe."
+        )
+    }
+
+    var paginasPDF by remember {
+        mutableStateOf<List<Bitmap>>(
+            emptyList()
+        )
+    }
+
+    var productosFlowActuales by remember {
+        mutableStateOf<List<ProductoFlow>>(
+            emptyList()
+        )
+    }
+
+    var resultadoPedido by remember {
+        mutableStateOf<ResultadoPedidoFlow?>(null)
+    }
+
+    var pedidoSugeridoActual by remember {
+        mutableStateOf<PedidoSugerido?>(null)
+    }
+    var familiasRevisionActuales by remember {
+        mutableStateOf<List<LineaPedidoFamiliaFlow>>(emptyList())
+    }
+    var mostrarPedido by remember {
+        mutableStateOf(false)
+    }
+
+    var mostrarSelectorProductos by remember {
+        mutableStateOf(false)
+    }
+
+    var productosManualesPedido by remember {
+        mutableStateOf<List<OrderSuggestion>>(
+            emptyList()
+        )
+    }
+
+    var mostrarPedidoManual by remember {
+        mutableStateOf(false)
+    }
+
+    var cantidadesPedidoManual by remember {
+        mutableStateOf<Map<Int, String>>(emptyMap())
+    }
+
+    var mostrarConfiguracion by remember {
+        mutableStateOf(false)
+    }
+
+    var mostrarMenuPedido by remember {
+        mutableStateOf(false)
+    }
+
+    var seccionInferior by remember {
+        mutableStateOf(0)
+    }
+
+    var cantidadesRevision by remember {
+        mutableStateOf<Map<Int, String>>(
+            emptyMap()
+        )
+    }
+
+    var cantidadesFamilias by remember {
+        mutableStateOf<Map<String, String>>(
+            emptyMap()
+        )
+    }
+
+    var eliminadosRevision by remember {
+        mutableStateOf<Set<Int>>(
+            emptySet()
+        )
+    }
+
+    var detallesExplicacionAbiertos by remember {
+        mutableStateOf<Set<Int>>(
+            emptySet()
+        )
+    }
+
+    var mostrarFamiliasDetalle by remember {
+        mutableStateOf(false)
+    }
+
+    var fechaInformeActual by remember {
+        mutableStateOf("")
+    }
+
+    var mensajeEnvio by remember {
+        mutableStateOf("")
+    }
+
+    var enviando by remember {
+        mutableStateOf(false)
+    }
+
+    var ipCineStock by remember {
+        mutableStateOf(
+            context
+                .getSharedPreferences(
+                    CINESTOCK_PREFS,
+                    android.content.Context.MODE_PRIVATE
+                )
+                .getString(
+                    CINESTOCK_IP_KEY,
+                    IP_CINESTOCK_POR_DEFECTO
+                )
+                ?: IP_CINESTOCK_POR_DEFECTO
+        )
+    }
+
+    var puertoCineStock by remember {
+        mutableStateOf(
+            context
+                .getSharedPreferences(
+                    CINESTOCK_PREFS,
+                    android.content.Context.MODE_PRIVATE
+                )
+                .getInt(
+                    CINESTOCK_PORT_KEY,
+                    PUERTO_CINESTOCK_POR_DEFECTO
+                )
+                .toString()
+        )
+    }
+
+    var mensajeConfiguracion by remember {
+        mutableStateOf("")
+    }
+
+    var mensajePruebaPdf by remember {
+        mutableStateOf("")
+    }
+
+    val selectorPDF =
+        rememberLauncherForActivityResult(
+            contract =
+                ActivityResultContracts.OpenDocument()
+        ) { uri: Uri? ->
+
+            if (uri != null) {
+
+                estado =
+                    "Cargando informe..."
+
+                paginasPDF =
+                    emptyList()
+
+                mostrarPedido =
+                    false
+
+                mostrarConfiguracion =
+                    false
+
+                cantidadesRevision =
+                    emptyMap()
+
+                cantidadesFamilias =
+                    emptyMap()
+
+                eliminadosRevision =
+                    emptySet()
+
+                productosManualesPedido =
+                    emptyList()
+
+                detallesExplicacionAbiertos =
+                    emptySet()
+
+                mostrarFamiliasDetalle =
+                    false
+
+                fechaInformeActual =
+                    ""
+
+                mensajeEnvio =
+                    ""
+
+                enviando =
+                    false
+
+                scope.launch {
+
+                    try {
+
+                        val resultado =
+                            withContext(
+                                Dispatchers.IO
+                            ) {
+
+                                val superMaestro =
+                                    cargarSuperMaestro(
+                                        context
+                                    )
+
+                                val numeroProductosMaestro =
+                                    superMaestro.length()
+
+                                println(
+                                    "FLOW SUPERMAESTRO - productos: " +
+                                            numeroProductosMaestro
+                                )
+
+                                val archivoPDF =
+                                    File(
+                                        context.cacheDir,
+                                        "flow_informe.pdf"
+                                    )
+
+                                context.contentResolver
+                                    .openInputStream(uri)
+                                    ?.use { input ->
+
+                                        archivoPDF
+                                            .outputStream()
+                                            .use { output ->
+
+                                                input.copyTo(
+                                                    output
+                                                )
+                                            }
+                                    }
+                                    ?: throw Exception(
+                                        "No se pudo abrir el PDF seleccionado."
+                                    )
+
+                                val inputParaPDFBox =
+                                    archivoPDF.inputStream()
+
+                                val documento =
+                                    PDDocument.load(
+                                        inputParaPDFBox
+                                    )
+
+                                val stripper =
+                                    PDFTextStripper()
+
+                                stripper.sortByPosition =
+                                    true
+
+                                val textoExtraido =
+                                    stripper.getText(
+                                        documento
+                                    )
+
+                                val numeroPaginas =
+                                    documento.numberOfPages
+
+                                documento.close()
+                                inputParaPDFBox.close()
+
+                                println(
+                                    "FLOW PDF - páginas: " +
+                                            numeroPaginas
+                                )
+
+                                println(
+                                    "FLOW PDF - caracteres: " +
+                                            textoExtraido.length
+                                )
+
+                                val productosInforme =
+                                    InformeParser.analizar(
+                                        textoExtraido
+                                    )
+
+                                println(
+                                    "FLOW PARSER - productos detectados: " +
+                                            productosInforme.size
+                                )
+                                println(
+                                    "FLOW FAMILIAS - 445 en informe: " +
+                                            productosInforme.count {
+                                                it.idVista == 445
+                                            }
+                                )
+
+                                productosInforme
+                                    .filter {
+                                        it.idVista == 445
+                                    }
+                                    .forEach { producto ->
+
+                                        println(
+                                            "FLOW FAMILIAS - 445 | " +
+                                                    "${producto.nombre} | " +
+                                                    "stock=${producto.stockFinal} | " +
+                                                    "uso=${producto.uso}"
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW FAMILIAS - 78 en informe: " +
+                                            productosInforme.count {
+                                                it.idVista == 78
+                                            }
+                                )
+
+                                productosInforme
+                                    .filter {
+                                        it.idVista == 78
+                                    }
+                                    .forEach { producto ->
+
+                                        println(
+                                            "FLOW FAMILIAS - 78 | " +
+                                                    "${producto.nombre} | " +
+                                                    "stock=${producto.stockFinal} | " +
+                                                    "uso=${producto.uso}"
+                                        )
+                                    }
+
+                                val superMaestroFlow =
+                                    FlowSuperMaestro.convertir(
+                                        superMaestro
+                                    )
+
+
+
+                                println(
+                                    "FLOW VARIANTES - 445 total: " +
+                                            superMaestroFlow.count {
+                                                it.idVista == 445
+                                            }
+                                )
+
+                                superMaestroFlow
+                                    .filter {
+                                        it.idVista == 445
+                                    }
+                                    .forEach { variante ->
+
+                                        println(
+                                            "FLOW VARIANTES - 445 | " +
+                                                    "${variante.umErp} | " +
+                                                    "${variante.producto} | " +
+                                                    "CONWAY=${variante.idConway} | " +
+                                                    "PACK=${variante.unidadesPorCajaPack}"
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW VARIANTES - 78 total: " +
+                                            superMaestroFlow.count {
+                                                it.idVista == 78
+                                            }
+                                )
+
+                                superMaestroFlow
+                                    .filter {
+                                        it.idVista == 78
+                                    }
+                                    .forEach { variante ->
+
+                                        println(
+                                            "FLOW VARIANTES - 78 | " +
+                                                    "${variante.umErp} | " +
+                                                    "${variante.producto} | " +
+                                                    "CONWAY=${variante.idConway} | " +
+                                                    "PACK=${variante.unidadesPorCajaPack}"
+                                        )
+                                    }
+
+                                val maestroPorIdVista =
+                                    HashMap<Int, JSONObject>()
+
+                                for (
+                                i in 0 until superMaestro.length()
+                                ) {
+
+                                    val registro =
+                                        superMaestro.getJSONObject(i)
+
+                                    val idVista =
+                                        registro
+                                            .optDouble(
+                                                "ID VISTA",
+                                                -1.0
+                                            )
+                                            .toInt()
+
+                                    val tipoRegistro =
+                                        registro
+                                            .optString(
+                                                "TIPO REGISTRO",
+                                                ""
+                                            )
+                                            .trim()
+                                            .uppercase()
+
+                                    /*
+                                     * Para el producto que representa el informe
+                                     * utilizamos exclusivamente el registro PRODUCTO.
+                                     *
+                                     * Las VARIANTES se conservan en el SUPERMAESTRO
+                                     * y las utiliza aparte FlowResolutorFamilias.
+                                     *
+                                     * Esto evita que una variante posterior machaque
+                                     * el registro principal de la misma ID VISTA.
+                                     */
+                                    if (
+                                        idVista >= 0 &&
+                                        tipoRegistro == "PRODUCTO"
+                                    ) {
+
+                                        maestroPorIdVista[
+                                            idVista
+                                        ] = registro
+                                    }
+                                }
+
+                                var encontrados =
+                                    0
+
+                                var noEncontrados =
+                                    0
+
+                                val productosConway =
+                                    mutableListOf<
+                                            Pair<
+                                                    ProductoInforme,
+                                                    JSONObject
+                                                    >
+                                            >()
+
+                                val noEncontradosLista =
+                                    mutableListOf<String>()
+
+                                productosInforme.forEach {
+                                        producto ->
+
+                                    val maestro =
+                                        maestroPorIdVista[
+                                            producto.idVista
+                                        ]
+
+                                    if (
+                                        maestro != null
+                                    ) {
+
+                                        encontrados++
+
+                                        productosConway.add(
+                                            producto to maestro
+                                        )
+
+                                    } else {
+
+                                        noEncontrados++
+
+                                        noEncontradosLista.add(
+                                            "${producto.idVista} | " +
+                                                    "${producto.nombre} | " +
+                                                    "${producto.um} | " +
+                                                    "stock ${producto.stockFinal}"
+                                        )
+                                    }
+                                }
+
+                                println(
+                                    "FLOW CRUCE - encontrados: " +
+                                            encontrados
+                                )
+
+                                println(
+                                    "FLOW CRUCE - NO encontrados: " +
+                                            noEncontrados
+                                )
+
+                                println(
+                                    "FLOW PEDIDO - productos Conway: " +
+                                            productosConway.size
+                                )
+
+                                println(
+                                    "FLOW MAESTRO - VALIDACION DE LOS 106 PRODUCTOS"
+                                )
+
+                                val camposMaestro =
+                                    listOf(
+                                        "ID ERP",
+                                        "ID CONWAY",
+                                        "UNIDAD PEDIDO FLOW",
+                                        "PRESENTACIÓN",
+                                        "ESTADO"
+                                    )
+
+                                camposMaestro.forEach {
+                                        campo ->
+
+                                    val conDato =
+                                        productosConway.count {
+                                                (_, maestro) ->
+
+                                            maestro
+                                                .optString(
+                                                    campo,
+                                                    ""
+                                                )
+                                                .isNotBlank()
+                                        }
+
+                                    println(
+                                        "FLOW MAESTRO - $campo: " +
+                                                "$conDato/" +
+                                                productosConway.size
+                                    )
+                                }
+
+                                println(
+                                    "FLOW INFORME - MUESTRA DE 5 PRODUCTOS"
+                                )
+
+                                productosConway
+                                    .take(5)
+                                    .forEach {
+                                            (producto, _) ->
+
+                                        println(
+                                            "FLOW INFORME - " +
+                                                    "${producto.idVista} | " +
+                                                    "${producto.nombre} | " +
+                                                    "inicial=${producto.stockInicial} | " +
+                                                    "ingresos=${producto.ingresos} | " +
+                                                    "transferencias=${producto.transferencias} | " +
+                                                    "ajustes=${producto.ajustes} | " +
+                                                    "desperdiciado=${producto.desperdiciado} | " +
+                                                    "ventas=${producto.ventas} | " +
+                                                    "uso=${producto.uso} | " +
+                                                    "final=${producto.stockFinal} | " +
+                                                    "coste=${producto.coste}"
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW MAESTRO - CAMPOS REALES DEL PRIMER PRODUCTO"
+                                )
+
+                                if (
+                                    productosConway.isNotEmpty()
+                                ) {
+
+                                    val primerMaestro =
+                                        productosConway
+                                            .first()
+                                            .second
+
+                                    val nombresCampos =
+                                        primerMaestro.keys()
+
+                                    while (
+                                        nombresCampos.hasNext()
+                                    ) {
+
+                                        val campo =
+                                            nombresCampos.next()
+
+                                        println(
+                                            "FLOW MAESTRO - CAMPO: " +
+                                                    "$campo = " +
+                                                    primerMaestro.opt(
+                                                        campo
+                                                    )
+                                        )
+                                    }
+                                }
+
+                                println(
+                                    "FLOW MAESTRO - MUESTRA DE 5 PRODUCTOS"
+                                )
+
+                                productosConway
+                                    .take(5)
+                                    .forEach {
+                                            (producto, maestro) ->
+
+                                        println(
+                                            "FLOW MAESTRO - " +
+                                                    "${producto.idVista} | " +
+                                                    "${producto.nombre} | " +
+                                                    "stock=${producto.stockFinal} | " +
+                                                    "ERP=${leerCampoIdNumericoComoTexto(maestro, "ID ERP")} | " +
+                                                    "CONWAY=${maestro.optString("ID CONWAY", "")} | " +
+                                                    "UNIDAD=${maestro.optString("UNIDAD PEDIDO FLOW", "")} | " +
+                                                    "PRESENTACION=${maestro.optString("PRESENTACIÓN", "")} | " +
+                                                    "ESTADO=${maestro.optString("ESTADO", "")}"
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW DATOS COMBINADOS - VALIDACION 106"
+                                )
+
+                                var combinadosValidos =
+                                    0
+
+                                productosConway.forEach {
+                                        (producto, maestro) ->
+
+                                    val idErp =
+                                        leerCampoIdNumericoComoTexto(
+                                            maestro,
+                                            "ID ERP"
+                                        )
+
+                                    val umErp =
+                                        maestro.optString(
+                                            "UM ERP",
+                                            ""
+                                        )
+
+                                    val idConway =
+                                        maestro.optString(
+                                            "ID CONWAY",
+                                            ""
+                                        )
+
+                                    val denominacionConway =
+                                        maestro.optString(
+                                            "DENOMINACIÓN LARGA CONWAY",
+                                            ""
+                                        )
+
+                                    val presentacion =
+                                        maestro.optString(
+                                            "PRESENTACIÓN",
+                                            ""
+                                        )
+
+                                    val unidadesCaja =
+                                        maestro.optString(
+                                            "UNIDADES POR CAJA/PACK",
+                                            ""
+                                        )
+
+                                    val unidadPedido =
+                                        maestro.optString(
+                                            "UNIDAD PEDIDO FLOW",
+                                            ""
+                                        )
+
+                                    val estadoMaestro =
+                                        maestro.optString(
+                                            "ESTADO",
+                                            ""
+                                        )
+
+                                    if (
+                                        producto.idVista > 0 &&
+                                        idErp.isNotBlank() &&
+                                        umErp.isNotBlank() &&
+                                        unidadPedido.isNotBlank() &&
+                                        estadoMaestro.isNotBlank()
+                                    ) {
+
+                                        combinadosValidos++
+                                    }
+                                }
+
+                                println(
+                                    "FLOW DATOS COMBINADOS - válidos: " +
+                                            "$combinadosValidos/" +
+                                            productosConway.size
+                                )
+
+                                val productosFlow =
+                                    productosConway.map {
+                                            (producto, maestro) ->
+
+                                        ProductoFlow(
+
+                                            idVista =
+                                                producto.idVista,
+
+                                            producto =
+                                                producto.nombre,
+
+                                            umInforme =
+                                                producto.um,
+
+                                            stockInicial =
+                                                producto.stockInicial,
+
+                                            ingresos =
+                                                producto.ingresos,
+
+                                            transferencias =
+                                                producto.transferencias,
+
+                                            ajustes =
+                                                producto.ajustes,
+
+                                            desperdiciado =
+                                                producto.desperdiciado,
+
+                                            ventas =
+                                                producto.ventas,
+
+                                            uso =
+                                                producto.uso,
+
+                                            stockFinal =
+                                                producto.stockFinal,
+
+                                            coste =
+                                                producto.coste,
+
+                                            idErp =
+                                                maestro.optString(
+                                                    "ID ERP",
+                                                    ""
+                                                ),
+
+                                            umErp =
+                                                maestro.optString(
+                                                    "UM ERP",
+                                                    ""
+                                                ),
+
+                                            idConway =
+                                                maestro.optString(
+                                                    "ID CONWAY",
+                                                    ""
+                                                ),
+
+                                            denominacionLargaConway =
+                                                maestro.optString(
+                                                    "DENOMINACIÓN LARGA CONWAY",
+                                                    ""
+                                                ),
+
+                                            presentacion =
+                                                maestro.optString(
+                                                    "PRESENTACIÓN",
+                                                    ""
+                                                ),
+
+                                            unidadesPorCajaPack =
+                                                maestro.optString(
+                                                    "UNIDADES POR CAJA/PACK",
+                                                    ""
+                                                ),
+
+                                            unidadPedidoFlow =
+                                                maestro.optString(
+                                                    "UNIDAD PEDIDO FLOW",
+                                                    ""
+                                                ),
+
+                                            estado =
+                                                maestro.optString(
+                                                    "ESTADO",
+                                                    ""
+                                                ),
+
+                                            fuente =
+                                                maestro.optString(
+                                                    "FUENTE",
+                                                    ""
+                                                ),
+
+                                            notaRegla =
+                                                maestro.optString(
+                                                    "NOTA / REGLA",
+                                                    ""
+                                                )
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - registros creados: " +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW RESOLUTOR - PRUEBA FAMILIA 445"
+                                )
+
+                                productosFlow
+                                    .filter {
+                                        it.idVista == 445
+                                    }
+                                    .firstOrNull()
+                                    ?.let { familia ->
+
+                                        val resolucion =
+                                            FlowResolutorFamilias.resolver(
+                                                familia =
+                                                    familia,
+                                                superMaestro =
+                                                    superMaestroFlow
+                                            )
+
+                                        println(
+                                            "FLOW RESOLUTOR - 445 | " +
+                                                    "variantes=" +
+                                                    resolucion.totalVariantes +
+                                                    " | enviables=" +
+                                                    resolucion.variantesConConway.size +
+                                                    " | sinConway=" +
+                                                    resolucion.variantesSinConway.size
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW RESOLUTOR - PRUEBA FAMILIA 78"
+                                )
+
+                                productosFlow
+                                    .filter {
+                                        it.idVista == 78
+                                    }
+                                    .firstOrNull()
+                                    ?.let { familia ->
+
+                                        val resolucion =
+                                            FlowResolutorFamilias.resolver(
+                                                familia =
+                                                    familia,
+                                                superMaestro =
+                                                    superMaestroFlow
+                                            )
+
+                                        println(
+                                            "FLOW RESOLUTOR - 78 | " +
+                                                    "variantes=" +
+                                                    resolucion.totalVariantes +
+                                                    " | enviables=" +
+                                                    resolucion.variantesConConway.size +
+                                                    " | sinConway=" +
+                                                    resolucion.variantesSinConway.size
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - VALIDACION ESTRUCTURAL"
+                                )
+
+                                val flowIdVista =
+                                    productosFlow.count {
+                                        it.idVista > 0
+                                    }
+
+                                val flowProducto =
+                                    productosFlow.count {
+                                        it.producto.isNotBlank()
+                                    }
+
+                                val flowErp =
+                                    productosFlow.count {
+                                        it.idErp.isNotBlank()
+                                    }
+
+                                val flowUmErp =
+                                    productosFlow.count {
+                                        it.umErp.isNotBlank()
+                                    }
+
+                                val flowUnidadPedido =
+                                    productosFlow.count {
+                                        it.unidadPedidoFlow.isNotBlank()
+                                    }
+
+                                val flowEstado =
+                                    productosFlow.count {
+                                        it.estado.isNotBlank()
+                                    }
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - ID VISTA: " +
+                                            "$flowIdVista/" +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - PRODUCTO: " +
+                                            "$flowProducto/" +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - ID ERP: " +
+                                            "$flowErp/" +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - UM ERP: " +
+                                            "$flowUmErp/" +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - UNIDAD PEDIDO: " +
+                                            "$flowUnidadPedido/" +
+                                            productosFlow.size
+                                )
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - ESTADO: " +
+                                            "$flowEstado/" +
+                                            productosFlow.size
+                                )
+
+                                noEncontradosLista.forEach {
+                                    println(
+                                        "FLOW CRUCE NO - $it"
+                                    )
+                                }
+
+                                println(
+                                    "FLOW PRODUCTOFLOW - MUESTRA"
+                                )
+
+                                productosFlow
+                                    .filter {
+                                        it.idVista == 10321 ||
+                                                it.idVista == 7289 ||
+                                                it.idVista == 9314
+                                    }
+                                    .forEach { producto ->
+
+                                        println(
+                                            "FLOW PRODUCTOFLOW - " +
+                                                    "${producto.idVista} | " +
+                                                    "${producto.producto} | " +
+                                                    "inicial=${producto.stockInicial} | " +
+                                                    "ingresos=${producto.ingresos} | " +
+                                                    "transferencias=${producto.transferencias} | " +
+                                                    "ajustes=${producto.ajustes} | " +
+                                                    "desperdiciado=${producto.desperdiciado} | " +
+                                                    "ventas=${producto.ventas} | " +
+                                                    "uso=${producto.uso} | " +
+                                                    "final=${producto.stockFinal} | " +
+                                                    "coste=${producto.coste} | " +
+                                                    "ERP=${producto.idErp} | " +
+                                                    "UM ERP=${producto.umErp} | " +
+                                                    "CONWAY=${producto.idConway} | " +
+                                                    "PRESENTACION=${producto.presentacion} | " +
+                                                    "UNIDAD=${producto.unidadPedidoFlow} | " +
+                                                    "ESTADO=${producto.estado}"
+                                        )
+                                    }
+
+                                println(
+                                    "FLOW PDF - INICIO TEXTO"
+                                )
+
+                                println(
+                                    "FLOW PDF - caracteres: " +
+                                            textoExtraido.length
+                                )
+
+                                File(
+                                    context.filesDir,
+                                    "texto_informe.txt"
+                                ).writeText(
+                                    textoExtraido
+                                )
+
+                                val descriptor =
+                                    ParcelFileDescriptor.open(
+                                        archivoPDF,
+                                        ParcelFileDescriptor.MODE_READ_ONLY
+                                    )
+
+                                val renderer =
+                                    PdfRenderer(
+                                        descriptor
+                                    )
+
+                                val paginas =
+                                    mutableListOf<Bitmap>()
+
+                                for (
+                                numero in
+                                0 until renderer.pageCount
+                                ) {
+
+                                    val pagina =
+                                        renderer.openPage(
+                                            numero
+                                        )
+
+                                    try {
+
+                                        val escala =
+                                            1.35f
+
+                                        val ancho =
+                                            (
+                                                    pagina.width *
+                                                            escala
+                                                    ).toInt()
+
+                                        val alto =
+                                            (
+                                                    pagina.height *
+                                                            escala
+                                                    ).toInt()
+
+                                        val bitmap =
+                                            Bitmap.createBitmap(
+                                                ancho,
+                                                alto,
+                                                Bitmap.Config.ARGB_8888
+                                            )
+
+                                        bitmap.eraseColor(
+                                            android.graphics.Color.WHITE
+                                        )
+
+                                        pagina.render(
+                                            bitmap,
+                                            null,
+                                            null,
+                                            PdfRenderer
+                                                .Page
+                                                .RENDER_MODE_FOR_DISPLAY
+                                        )
+
+                                        paginas.add(
+                                            bitmap
+                                        )
+
+                                    } finally {
+
+                                        pagina.close()
+                                    }
+                                }
+
+                                renderer.close()
+                                descriptor.close()
+
+                                ResultadoInformeFlow(
+                                    paginas =
+                                        paginas,
+                                    numeroPaginas =
+                                        numeroPaginas,
+                                    textoExtraido =
+                                        textoExtraido,
+                                    productosFlow =
+                                        productosFlow
+                                )
+                            }
+
+                        paginasPDF =
+                            resultado.paginas
+
+                        productosFlowActuales =
+                            resultado.productosFlow
+
+                        val fechaInforme =
+                            extraerFechaInicioInforme(
+                                resultado.textoExtraido
+                            )
+
+                        fechaInformeActual =
+                            fechaInforme
+
+                        val pedidoGenerado =
+                            FlowGeneradorPedido.generar(
+                                productos =
+                                    resultado.productosFlow,
+                                context =
+                                    context,
+                                fechaInformeActual =
+                                    fechaInforme
+                            )
+
+
+                        Log.d(
+                            "FLOW DIAGNOSTICO",
+                            "pedidoGenerado.productos.size=" +
+                                    pedidoGenerado.productos.size
+                        )
+
+                        pedidoGenerado.productos
+                            .take(10)
+
+                            .forEach { propuesta ->
+
+                                Log.d(
+                                    "FLOW DIAGNOSTICO",
+                                    "${propuesta.idVista} | " +
+                                            "${propuesta.producto} | " +
+                                            "CONWAY=${propuesta.idConway}"
+                                )
+                            }
+
+                        println(
+                            "FLOW PEDIDO - 445: " +
+                                    pedidoGenerado.productos.count {
+                                        it.idVista == 445
+                                    }
+                        )
+
+                        println(
+                            "FLOW PEDIDO - 78: " +
+                                    pedidoGenerado.productos.count {
+                                        it.idVista == 78
+                                    }
+                        )
+
+                        pedidoSugeridoActual =
+                            pedidoGenerado
+                        val evaluacionEficiencia =
+                            FlowEficienciaPedido.evaluar(
+                                productos =
+                                    pedidoGenerado.productos
+                            )
+
+                        Log.d(
+                            "FLOW EFICIENCIA",
+                            "GENERACIÓN | " +
+                                    "líneas=${evaluacionEficiencia.lineas} | " +
+                                    "básicos=${evaluacionEficiencia.basicosPresentes} | " +
+                                    "detectados=${evaluacionEficiencia.basicosDetectados} | " +
+                                    "eficiente=${evaluacionEficiencia.esPedidoEficiente} | " +
+                                    "motivo=${evaluacionEficiencia.motivo}"
+                        )
+                        val superMaestroParaFamilias =
+                            FlowSuperMaestro.convertir(
+                                cargarSuperMaestro(context)
+                            )
+
+                        familiasRevisionActuales =
+                            resultado.productosFlow
+                                .distinctBy { it.idVista }
+                                .mapNotNull { posibleFamilia ->
+
+                                    val resolucion =
+                                        FlowResolutorFamilias.resolver(
+                                            familia = posibleFamilia,
+                                            superMaestro =
+                                                superMaestroParaFamilias
+                                        )
+
+                                    if (resolucion.totalVariantes > 1) {
+                                        FlowPedidoFamilias.construirLineas(
+                                            resolucion
+                                        )
+                                    } else {
+                                        null
+                                    }
+                                }
+                                .flatten()
+
+                        cantidadesFamilias =
+                            familiasRevisionActuales
+                                .associate { variante ->
+                                    claveVarianteFamiliaRevision(variante) to
+                                            formatearCantidadRevision(
+                                                variante.cantidad
+                                            )
+                                }
+
+                        cantidadesRevision =
+                            pedidoGenerado.productos
+                                .associate {
+                                        propuesta ->
+
+                                    propuesta.idVista to
+                                            formatearCantidadRevision(
+                                                propuesta
+                                                    .cantidadSugerida
+                                            )
+                                }
+
+                        eliminadosRevision =
+                            emptySet()
+
+                        mensajeEnvio =
+                            ""
+
+                        Log.d(
+                            "FLOW NUEVO PEDIDO",
+                            "PedidoSugerido generado - " +
+                                    "productos=" +
+                                    "${pedidoSugeridoActual?.totalProductos} | " +
+                                    "con histórico=" +
+                                    "${pedidoSugeridoActual?.productosConHistorico} | " +
+                                    "sin histórico=" +
+                                    "${pedidoSugeridoActual?.productosSinHistorico} | " +
+                                    "revisión=" +
+                                    "${pedidoSugeridoActual?.productosPendientesRevision}"
+                        )
+
+                        resultadoPedido =
+                            FlowMotorPedido.analizarTodos(
+                                productos =
+                                    resultado.productosFlow,
+                                context =
+                                    context
+                            )
+
+                        FlowHistorial.guardarSemana(
+                            context =
+                                context,
+                            fechaInforme =
+                                fechaInforme,
+                            productos =
+                                resultado.productosFlow
+                        )
+
+                        Log.d(
+                            "FLOW PEDIDO",
+                            "Propuestas generadas: " +
+                                    "${resultadoPedido?.propuestas?.size ?: 0}"
+                        )
+
+                        Log.d(
+                            "FLOW HISTORICO",
+                            "Semanas guardadas: " +
+                                    "${FlowHistorial.numeroSemanas(context)}"
+                        )
+
+                        val productoHistorico =
+                            FlowHistorial.obtenerProductoDeSemana(
+                                context =
+                                    context,
+                                indiceSemana =
+                                    0,
+                                idVista =
+                                    7289
+                            )
+
+                        val historialNuggets =
+                            FlowHistorial.obtenerHistorialProducto(
+                                context =
+                                    context,
+                                idVista =
+                                    7289
+                            )
+
+                        Log.d(
+                            "FLOW HISTORICO",
+                            "Nuggets veganos - semanas encontradas: " +
+                                    "${historialNuggets.size}"
+                        )
+
+                        val resumenNuggets =
+                            FlowAnalisisHistorico.analizarProducto(
+                                historial =
+                                    historialNuggets,
+                                idVista =
+                                    7289
+                            )
+
+                        Log.d(
+                            "FLOW ANALISIS",
+                            "Nuggets veganos" +
+                                    " | semanas=${resumenNuggets?.semanas}" +
+                                    " | consumo medio=${resumenNuggets?.mediaConsumo}" +
+                                    " | mínimo=${resumenNuggets?.consumoMinimo}" +
+                                    " | máximo=${resumenNuggets?.consumoMaximo}" +
+                                    " | variación=${resumenNuggets?.variacionAbsoluta}" +
+                                    " | evidencia=${resumenNuggets?.nivelEvidencia}"
+                        )
+
+                        Log.d(
+                            "FLOW HISTORICO",
+                            "Nuggets veganos - histórico: " +
+                                    productoHistorico
+                        )
+
+                        estado =
+                            "Informe cargado correctamente\n" +
+                                    "Páginas: ${resultado.numeroPaginas}\n" +
+                                    "Productos Conway: ${resultado.productosFlow.size}\n" +
+                                    "Propuestas analizadas: " +
+                                    "${resultadoPedido?.propuestas?.size ?: 0}"
+
+                        Toast.makeText(
+                            context,
+                            "Informe cargado correctamente",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                    } catch (
+                        e: Exception
+                    ) {
+
+                        paginasPDF =
+                            emptyList()
+
+                        estado =
+                            "ERROR cargando el informe:\n" +
+                                    e.message
+
+                        Toast.makeText(
+                            context,
+                            "Error cargando el informe",
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        e.printStackTrace()
+                    }
+                }
+            }
+        }
+
+    Scaffold(
+        modifier =
+            Modifier.fillMaxSize(),
+
+        bottomBar = {
+            if (
+                !mostrarConfiguracion &&
+                !mostrarPedido &&
+                !mostrarPedidoManual
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(78.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                mostrarPedidoManual = false
+                                mostrarPedido = true
+                                pedidoSugeridoActual?.let {
+                                    Log.d(
+                                        "FLOW PEDIDO",
+                                        "PEDIDO SUGERIDO pulsado - propuestas: ${it.productos.size}"
+                                    )
+                                }
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FlowBottomBarItem(
+                            label = "SUGERIDO",
+                            contentDescription = "Pedido sugerido"
+                        ) {
+                            FlowPackageIcon()
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                mostrarPedido = false
+                                mostrarPedidoManual = true
+                                Log.d("FLOW PEDIDO", "PEDIDO MANUAL pulsado")
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FlowBottomBarItem(
+                            label = "MANUAL",
+                            contentDescription = "Pedido manual"
+                        ) {
+                            FlowClipboardIcon()
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable {
+                                mostrarConfiguracion = true
+                                mensajeConfiguracion = ""
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        FlowBottomBarItem(
+                            label = "AJUSTES",
+                            contentDescription = "Configuracion"
+                        ) {
+                            FlowGearIcon()
+                        }
+                    }
+                }
+            }
+        }    ) { innerPadding ->
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+            verticalArrangement =
+                Arrangement.Top
+        ) {
+
+            if (mostrarConfiguracion) {
+
+                Text(
+                    text =
+                        "CONFIGURACIÓN CINESTOCK",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .headlineMedium
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+
+                Text(
+                    text =
+                        "Configura la dirección del CineStock Windows " +
+                                "que recibe los pedidos de FLOW.",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+
+                OutlinedTextField(
+                    value =
+                        ipCineStock,
+
+                    onValueChange = {
+                            nuevoValor ->
+                        ipCineStock =
+                            nuevoValor
+                    },
+
+                    label = {
+                        Text(
+                            "IP de CineStock Windows"
+                        )
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    singleLine =
+                        true
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                OutlinedTextField(
+                    value =
+                        puertoCineStock,
+
+                    onValueChange = {
+                            nuevoValor ->
+
+                        puertoCineStock =
+                            nuevoValor.filter {
+                                it.isDigit()
+                            }
+                    },
+
+                    label = {
+                        Text(
+                            "Puerto"
+                        )
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth(),
+
+                    singleLine =
+                        true,
+
+                    keyboardOptions =
+                        KeyboardOptions(
+                            keyboardType =
+                                KeyboardType.Number
+                        )
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(16.dp)
+                )
+
+                Button(
+                    onClick = {
+
+                        val ip =
+                            ipCineStock.trim()
+
+                        val puerto =
+                            puertoCineStock
+                                .trim()
+                                .toIntOrNull()
+
+                        when {
+
+                            ip.isBlank() -> {
+
+                                mensajeConfiguracion =
+                                    "La IP no puede estar vacía."
+                            }
+
+                            puerto == null ||
+                                    puerto !in 1..65535 -> {
+
+                                mensajeConfiguracion =
+                                    "El puerto debe estar entre 1 y 65535."
+                            }
+
+                            else -> {
+
+                                context
+                                    .getSharedPreferences(
+                                        CINESTOCK_PREFS,
+                                        android.content.Context.MODE_PRIVATE
+                                    )
+                                    .edit()
+                                    .putString(
+                                        CINESTOCK_IP_KEY,
+                                        ip
+                                    )
+                                    .putInt(
+                                        CINESTOCK_PORT_KEY,
+                                        puerto
+                                    )
+                                    .apply()
+
+                                ipCineStock =
+                                    ip
+
+                                puertoCineStock =
+                                    puerto.toString()
+
+                                mensajeConfiguracion =
+                                    "Configuración guardada: " +
+                                            "$ip:$puerto"
+
+                                Toast.makeText(
+                                    context,
+                                    "Configuración guardada",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    },
+
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                ) {
+
+                    Text(
+                        "GUARDAR CONFIGURACIÓN",
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleLarge
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                Button(
+                    onClick = {
+
+                        mostrarConfiguracion =
+                            false
+
+                        mensajeConfiguracion =
+                            ""
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+
+                    Text(
+                        "VOLVER"
+                    )
+                }
+
+                if (
+                    mensajeConfiguracion.isNotBlank()
+                ) {
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(16.dp)
+                    )
+
+                    Text(
+                        text =
+                            mensajeConfiguracion,
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodyMedium
+                    )
+                }
+
+            } else if (mostrarPedido) {
+
+                val productosPedido =
+                    (
+                            pedidoSugeridoActual
+                                ?.productos
+                                .orEmpty()
+                                .filter { propuesta ->
+                                    propuesta.estado == "PEDIR" &&
+                                            (propuesta.cantidadSugerida ?: 0.0) > 0.0
+                                }
+                                .filterNot { propuesta ->
+                                    propuesta.idVista in
+                                            eliminadosRevision
+                                } +
+                                    productosManualesPedido
+                            )
+                        .distinctBy {
+                            it.idVista
+                        }
+
+                val propuestasActivasPorIdVista =
+                    productosPedido
+                        .associateBy { it.idVista }
+
+                val propuestasMotorPorIdVista =
+                    resultadoPedido
+                        ?.propuestas
+                        ?.associateBy { it.idVista }
+                        .orEmpty()
+
+                /*
+                 * LISTADO VISUAL: mostramos todos los productos gestionables
+                 * que tienen ID CONWAY válido.
+                 *
+                 * Un producto que no sea una propuesta activa aparece con
+                 * cantidad 0. Esto es únicamente para la revisión visual;
+                 * no lo convierte por sí mismo en una línea de pedido.
+                 */
+                val productosVisiblesPedido =
+                    (
+                            productosFlowActuales
+                                .filter { producto ->
+                                    producto.idConway.isNotBlank() &&
+                                            producto.idConway != "-" &&
+                                            producto.idConway != "—"
+                                }
+                                .map { producto ->
+
+                                    propuestasActivasPorIdVista[
+                                        producto.idVista
+                                    ]
+                                        ?: crearSugerenciaVisualNoPropuesta(
+                                            producto = producto,
+                                            propuesta =
+                                                propuestasMotorPorIdVista[
+                                                    producto.idVista
+                                                ]
+                                        )
+                                }
+                            )
+                        .distinctBy { it.idVista }
+
+                val idsActivosPedido =
+                    productosPedido
+                        .map { it.idVista }
+                        .toSet()
+
+                val totalEliminados =
+                    eliminadosRevision.size
+
+                val evaluacionEficienciaActual =
+                    FlowEficienciaPedido.evaluar(
+                        productos =
+                            productosPedido,
+                        cantidadesFinales =
+                            cantidadesRevision
+                    )
+
+                val evaluacionEficiencia =
+                    FlowEficienciaPedido.evaluar(
+                        productos =
+                            productosPedido,
+                        cantidadesFinales =
+                            cantidadesRevision
+                    )
+
+
+
+                if (mostrarSelectorProductos) {
+
+                    FlowSelectorProductosManual(
+                        productos =
+                            productosFlowActuales,
+
+                        idsYaIncluidos =
+                            productosPedido
+                                .map {
+                                    it.idVista
+                                }
+                                .toSet(),
+
+                        onAgregar = { producto ->
+
+                            val nuevaSugerencia =
+                                FlowProductoManual.crearSugerencia(
+                                    producto
+                                )
+
+                            productosManualesPedido =
+                                (
+                                        productosManualesPedido +
+                                                nuevaSugerencia
+                                        )
+                                    .distinctBy {
+                                        it.idVista
+                                    }
+
+                            cantidadesRevision =
+                                cantidadesRevision +
+                                        (
+                                                producto.idVista to
+                                                        "1"
+                                                )
+
+                            mostrarSelectorProductos =
+                                false
+                        },
+
+                        onCerrar = {
+                            mostrarSelectorProductos =
+                                false
+                        }
+                    )
+                }
+
+                Button(
+                    onClick = {
+                        mostrarSelectorProductos = true
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = "AÑADIR PRODUCTO"
+                    )
+                }
+
+                Log.d(
+                    "FLOW UI",
+                    "PEDIDO SUGERIDO - " +
+                            "total=${pedidoSugeridoActual?.productos?.size ?: 0} | " +
+                            "PEDIR=${pedidoSugeridoActual?.productos?.count { it.estado == "PEDIR" }} | " +
+                            "activos=${productosPedido.size}"
+                )
+
+                val listaPedidoState =
+                    rememberLazyListState()
+
+                Text(
+                    text = "PEDIDO SUGERIDO",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White
+                )
+
+                Spacer(
+                    modifier = Modifier.height(8.dp)
+                )
+
+                Text(
+                    text =
+                        "FLOW propone: " +
+                                "${productosPedido.size} línea(s)" +
+                                " · Eliminadas: " +
+                                "$totalEliminados",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleMedium
+                )
+                Spacer(
+                    modifier =
+                        Modifier.height(6.dp)
+                )
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(
+                                Color(0xFF181A1F)
+                            )
+                            .padding(
+                                horizontal = 14.dp,
+                                vertical = 10.dp
+                            )
+                ) {
+
+                    Text(
+                        text =
+                            "VIABILIDAD DEL PEDIDO",
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .labelLarge,
+
+                        color =
+                            if (evaluacionEficienciaActual.esPedidoEficiente) {
+                                Color(0xFF7DD3A8)
+                            } else {
+                                Color(0xFFFFB86B)
+                            }
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(3.dp)
+                    )
+
+                    Text(
+                        text =
+                            "${evaluacionEficienciaActual.lineas} líneas · " +
+                                    "${evaluacionEficienciaActual.basicosPresentes} básicos",
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .titleSmall,
+
+                        color =
+                            Color.White
+                    )
+
+                    Text(
+                        text =
+                            if (
+                                evaluacionEficienciaActual.esPedidoEficiente
+                            ) {
+                                "Cumple los mínimos de viabilidad configurados."
+                            } else {
+                                evaluacionEficienciaActual.motivo
+                            },
+
+                        style =
+                            MaterialTheme
+                                .typography
+                                .bodySmall,
+
+                        color =
+                            Color(0xFF8F96A3)
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(8.dp)
+                )
+
+
+
+                LazyColumn(
+                    state =
+                        listaPedidoState,
+
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                ) {
+
+                    items(
+                        items =
+                            productosVisiblesPedido,
+
+                        key = {
+                                propuesta ->
+                            propuesta.idVista
+                        }
+                    ) { propuesta ->
+
+                        val esActivaEnPedido =
+                            propuesta.idVista in idsActivosPedido
+
+                        val cantidadActual =
+                            if (esActivaEnPedido) {
+                                cantidadesRevision[
+                                    propuesta.idVista
+                                ]
+                                    ?.trim()
+                                    ?.toDoubleOrNull()
+                                    ?: (
+                                            propuesta.cantidadSugerida
+                                                ?: 0.0
+                                            )
+                            } else {
+                                0.0
+                            }
+
+                        val stockAnterior =
+                            propuesta.stockActualRegistrado
+                                ?.toString()
+                                ?: "—"
+
+                        val colorAcento =
+                            if (!esActivaEnPedido) {
+                                Color(0xFF4B5563)
+                            } else if (propuesta.debeRevisarse) {
+                                Color(0xFFFF8A80)
+                            } else {
+                                Color(0xFF4DD0E1)
+                            }
+
+                        Box(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(
+                                        Color(0xFF111214),
+                                        androidx.compose.foundation.shape.RoundedCornerShape(
+                                            12.dp
+                                        )
+                                    )
+                                    .padding(
+                                        horizontal = 10.dp,
+                                        vertical = 8.dp
+                                    )
+                        ) {
+
+                            Row(
+                                modifier =
+                                    Modifier.fillMaxWidth(),
+                                verticalAlignment =
+                                    Alignment.CenterVertically
+                            ) {
+
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .widthIn(
+                                                min = 3.dp,
+                                                max = 3.dp
+                                            )
+                                            .height(48.dp)
+                                            .background(
+                                                colorAcento,
+                                                androidx.compose.foundation.shape.RoundedCornerShape(
+                                                    3.dp
+                                                )
+                                            )
+                                )
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.width(9.dp)
+                                )
+
+                                Column(
+                                    modifier =
+                                        Modifier.weight(1f)
+                                ) {
+
+                                    Text(
+                                        text = propuesta.producto,
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodyLarge,
+                                        color = Color.White,
+                                        maxLines = 2
+                                    )
+                                }
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.width(8.dp)
+                                )
+
+                                if (esActivaEnPedido) {
+
+                                    Row(
+                                        verticalAlignment =
+                                            Alignment.CenterVertically
+                                    ) {
+
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .background(
+                                                        Color(0xFF1C1D20),
+                                                        androidx.compose.foundation.shape.RoundedCornerShape(
+                                                            9.dp
+                                                        )
+                                                    )
+                                                    .padding(
+                                                        horizontal = 7.dp,
+                                                        vertical = 2.dp
+                                                    )
+                                                    .clickable {
+                                                        val nuevaCantidad =
+                                                            (
+                                                                    cantidadActual - 1.0
+                                                                    )
+                                                                .coerceAtLeast(0.0)
+
+                                                        cantidadesRevision =
+                                                            cantidadesRevision +
+                                                                    (
+                                                                            propuesta.idVista to
+                                                                                    formatearCantidadRevision(
+                                                                                        nuevaCantidad
+                                                                                    )
+                                                                            )
+                                                    }
+                                        ) {
+                                            Text(
+                                                text = "−",
+                                                style =
+                                                    MaterialTheme
+                                                        .typography
+                                                        .titleMedium,
+                                                color =
+                                                    Color(0xFFB8BEC8)
+                                            )
+                                        }
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.width(6.dp)
+                                        )
+
+                                        Text(
+                                            text =
+                                                formatearCantidadRevision(
+                                                    cantidadActual
+                                                ),
+                                            style =
+                                                MaterialTheme
+                                                    .typography
+                                                    .titleLarge,
+                                            color =
+                                                Color(0xFFB8F2E6),
+                                            modifier =
+                                                Modifier
+                                                    .widthIn(
+                                                        min = 42.dp
+                                                    ),
+                                            textAlign =
+                                                androidx.compose.ui.text.style.TextAlign.Center
+                                        )
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.width(6.dp)
+                                        )
+
+                                        Box(
+                                            modifier =
+                                                Modifier
+                                                    .background(
+                                                        Color(0xFF1C1D20),
+                                                        androidx.compose.foundation.shape.RoundedCornerShape(
+                                                            9.dp
+                                                        )
+                                                    )
+                                                    .padding(
+                                                        horizontal = 7.dp,
+                                                        vertical = 2.dp
+                                                    )
+                                                    .clickable {
+                                                        val nuevaCantidad =
+                                                            cantidadActual + 1.0
+
+                                                        cantidadesRevision =
+                                                            cantidadesRevision +
+                                                                    (
+                                                                            propuesta.idVista to
+                                                                                    formatearCantidadRevision(
+                                                                                        nuevaCantidad
+                                                                                    )
+                                                                            )
+                                                    }
+                                        ) {
+                                            Text(
+                                                text = "+",
+                                                style =
+                                                    MaterialTheme
+                                                        .typography
+                                                        .titleMedium,
+                                                color =
+                                                    Color(0xFFB8BEC8)
+                                            )
+                                        }
+
+                                    }
+
+                                } else {
+
+                                    Text(
+                                        text = "0",
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .titleLarge,
+                                        color =
+                                            Color(0xFF646B76),
+                                        modifier =
+                                            Modifier.widthIn(
+                                                min = 42.dp
+                                            ),
+                                        textAlign =
+                                            androidx.compose.ui.text.style.TextAlign.Center
+                                    )
+                                }
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.width(8.dp)
+                                )
+
+                                Column(
+                                    horizontalAlignment =
+                                        Alignment.End
+                                ) {
+
+                                    Text(
+                                        text = "STOCK",
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .labelSmall,
+                                        color =
+                                            Color(0xFF6F7783)
+                                    )
+
+                                    Text(
+                                        text = stockAnterior,
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodyLarge,
+                                        color = Color.White
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(5.dp)
+                        )
+                    }
+                    val hayFamiliasConCantidad =
+                        familiasRevisionActuales.any { variante ->
+                            val texto =
+                                cantidadesFamilias[
+                                    claveVarianteFamiliaRevision(variante)
+                                ]
+                                    ?.trim()
+                                    .orEmpty()
+
+                            val cantidad =
+                                texto.toDoubleOrNull()
+                                    ?: 0.0
+
+                            cantidad > 0.0 &&
+                                    variante.idConway.isNotBlank() &&
+                                    variante.idConway != "-" &&
+                                    variante.idConway != "—"
+                        }
+
+                    if (
+                        familiasRevisionActuales.isNotEmpty()
+                    ) {
+
+                        item {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(12.dp)
+                            )
+
+                            Text(
+                                text =
+                                    "Familias detectadas: " +
+                                            familiasRevisionActuales
+                                                .groupBy {
+                                                    it.idVistaFamilia to it.familia
+                                                }
+                                                .size,
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .titleMedium
+                            )
+
+                            Button(
+                                onClick = {
+                                    mostrarFamiliasDetalle =
+                                        !mostrarFamiliasDetalle
+                                },
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    if (mostrarFamiliasDetalle) {
+                                        "OCULTAR FAMILIAS"
+                                    } else {
+                                        "VER FAMILIAS"
+                                    }
+                                )
+                            }
+
+                            if (
+                                mostrarFamiliasDetalle
+                            ) {
+
+                                familiasRevisionActuales
+                                    .groupBy {
+                                        it.idVistaFamilia to it.familia
+                                    }
+                                    .forEach { (familia, variantes) ->
+
+                                        Text(
+                                            text =
+                                                "${familia.second} · ID VISTA ${familia.first} · " +
+                                                        "${variantes.size} variantes",
+                                            style =
+                                                MaterialTheme
+                                                    .typography
+                                                    .titleMedium
+                                        )
+
+                                        variantes.forEach { variante ->
+                                            Text(
+                                                text =
+                                                    "${variante.producto}",
+                                                style =
+                                                    MaterialTheme
+                                                        .typography
+                                                        .bodyMedium
+                                            )
+
+                                            Text(
+                                                text =
+                                                    "Conway: ${variante.idConway} · " +
+                                                            "${variante.presentacion}",
+                                                style =
+                                                    MaterialTheme
+                                                        .typography
+                                                        .bodySmall
+                                            )
+
+                                            val tieneConway =
+                                                variante.idConway.isNotBlank() &&
+                                                        variante.idConway != "-" &&
+                                                        variante.idConway != "—"
+
+                                            if (tieneConway) {
+                                                OutlinedTextField(
+                                                    value =
+                                                        cantidadesFamilias[
+                                                            claveVarianteFamiliaRevision(
+                                                                variante
+                                                            )
+                                                        ] ?: "0",
+
+                                                    onValueChange = {
+                                                            nuevoValor ->
+
+                                                        cantidadesFamilias =
+                                                            cantidadesFamilias +
+                                                                    (
+                                                                            claveVarianteFamiliaRevision(
+                                                                                variante
+                                                                            ) to
+                                                                                    nuevoValor
+                                                                            )
+                                                    },
+
+                                                    label = {
+                                                        Text(
+                                                            "Cantidad final · ${variante.unidadPedido}"
+                                                        )
+                                                    },
+
+                                                    modifier =
+                                                        Modifier.fillMaxWidth(),
+
+                                                    singleLine =
+                                                        true
+                                                )
+                                            } else {
+                                                Text(
+                                                    text =
+                                                        "NO ENVIABLE: SIN ID CONWAY",
+                                                    style =
+                                                        MaterialTheme
+                                                            .typography
+                                                            .bodySmall
+                                                )
+                                            }
+
+                                            Spacer(
+                                                modifier =
+                                                    Modifier.height(8.dp)
+                                            )
+                                        }
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.height(8.dp)
+                                        )
+                                    }
+                            }
+                        }
+                    }
+
+                    if (
+                        pedidoSugeridoActual
+                            ?.productosAmbiguos
+                            ?.isNotEmpty() == true
+                    ) {
+
+                        item {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(12.dp)
+                            )
+
+                            Text(
+                                text =
+                                    "PENDIENTES DE REVISIÓN: " +
+                                            "${pedidoSugeridoActual?.productosAmbiguos?.size ?: 0}",
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .titleMedium
+                            )
+
+                            pedidoSugeridoActual
+                                ?.productosAmbiguos
+                                ?.forEach { propuesta ->
+
+                                    Text(
+                                        text =
+                                            propuesta.producto,
+                                        style =
+                                            MaterialTheme
+                                                .typography
+                                                .bodyMedium
+                                    )
+                                }
+                        }
+                    }
+
+                    if (
+                        productosPedido.isEmpty()
+                    ) {
+
+                        item {
+
+                            Text(
+                                text =
+                                    "No hay líneas activas en la revisión.",
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodyLarge
+                            )
+                        }
+                    }
+
+
+
+                    item {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(20.dp)
+                        )
+
+                        Button(
+                            onClick = {
+
+                                if (
+                                    productosPedido.isEmpty() &&
+                                    !hayFamiliasConCantidad
+                                ) {
+
+                                    mensajeEnvio =
+                                        "No hay líneas activas para enviar."
+
+                                    return@Button
+                                }
+
+                                if (
+                                    fechaInformeActual.isBlank()
+                                ) {
+
+                                    mensajeEnvio =
+                                        "No hay fecha de informe disponible para el envío."
+
+                                    return@Button
+                                }
+
+                                scope.launch {
+
+                                    enviando =
+                                        true
+
+                                    mensajeEnvio =
+                                        "Preparando pedido final..."
+
+                                    try {
+
+                                        val pedidoFinal =
+                                            FlowPedidoFinal.crear(
+                                                productos =
+                                                    productosPedido,
+                                                cantidades =
+                                                    cantidadesRevision,
+                                                familias =
+                                                    familiasRevisionActuales,
+                                                cantidadesFamilias =
+                                                    cantidadesFamilias
+                                            )
+                                        val evaluacionEficiencia =
+                                            FlowEficienciaPedido.evaluar(
+                                                productos =
+                                                    productosPedido,
+                                                cantidadesFinales =
+                                                    cantidadesRevision
+                                            )
+
+                                        Log.d(
+                                            "FLOW EFICIENCIA",
+                                            "líneas=${evaluacionEficiencia.lineas} | " +
+                                                    "básicos=${evaluacionEficiencia.basicosPresentes} | " +
+                                                    "detectados=${evaluacionEficiencia.basicosDetectados} | " +
+                                                    "eficiente=${evaluacionEficiencia.esPedidoEficiente} | " +
+                                                    "motivo=${evaluacionEficiencia.motivo}"
+                                        )
+
+                                        Log.d(
+                                            "FLOW ENVIO",
+                                            "Pedido final preparado - " +
+                                                    "líneas=" +
+                                                    "${pedidoFinal.lineas.size} | " +
+                                                    "líneas activas UI=" +
+                                                    "${productosPedido.size}"
+                                        )
+
+                                        withContext(
+                                            Dispatchers.IO
+                                        ) {
+
+                                            FlowPedidoFinal.guardar(
+                                                context =
+                                                    context,
+                                                pedido =
+                                                    pedidoFinal
+                                            )
+                                        }
+                                        mensajeEnvio =
+                                            "Generando PDF pedido final..."
+
+                                        val resultadoPdf =
+                                            withContext(
+                                                Dispatchers.IO
+                                            ) {
+                                                FlowPdfPedidoFinal.generar(
+                                                    context = context,
+                                                    archivoOriginal =
+                                                        File(
+                                                            context.cacheDir,
+                                                            "flow_informe.pdf"
+                                                        ),
+                                                    pedidoFinal = pedidoFinal
+                                                )
+                                            }
+
+                                        Log.d(
+                                            "FLOW ENVIO",
+                                            "PDF FINAL OK - " +
+                                                    "archivo=${resultadoPdf.archivo.absolutePath} | " +
+                                                    "líneas=${resultadoPdf.lineasEscritas} | " +
+                                                    "familiasPendientes=${resultadoPdf.familiasPendientes}"
+                                        )
+
+                                        mensajeEnvio =
+                                            "Enviando " +
+                                                    "${pedidoFinal.lineas.size} línea(s) " +
+                                                    "a CineStock Windows..."
+
+                                        val resultadoEnvio =
+                                            FlowPedidoEnvio.enviar(
+                                                context =
+                                                    context,
+                                                pedido =
+                                                    pedidoFinal,
+                                                fechaInforme =
+                                                    fechaInformeActual
+                                            )
+
+                                        if (
+                                            resultadoEnvio.ok
+                                        ) {
+
+                                            mensajeEnvio =
+                                                resultadoEnvio.mensaje +
+                                                        " OrderId: " +
+                                                        resultadoEnvio.orderId
+
+                                            Log.d(
+                                                "FLOW ENVIO",
+                                                "ENVÍO OK - " +
+                                                        "líneas=" +
+                                                        "${pedidoFinal.lineas.size} | " +
+                                                        "orderId=" +
+                                                        resultadoEnvio.orderId
+                                            )
+
+                                            Toast.makeText(
+                                                context,
+                                                "Pedido enviado correctamente",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+
+                                        } else {
+
+                                            mensajeEnvio =
+                                                resultadoEnvio.mensaje
+
+                                            Log.e(
+                                                "FLOW ENVIO",
+                                                "ENVÍO ERROR - " +
+                                                        resultadoEnvio.mensaje +
+                                                        " | respuesta=" +
+                                                        resultadoEnvio.cuerpoRespuesta
+                                            )
+
+                                            Toast.makeText(
+                                                context,
+                                                resultadoEnvio.mensaje,
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+
+                                    } catch (
+                                        e: Exception
+                                    ) {
+
+                                        mensajeEnvio =
+                                            "Error preparando el pedido: " +
+                                                    (
+                                                            e.message
+                                                                ?: e.javaClass.simpleName
+                                                            )
+
+                                        Log.e(
+                                            "FLOW ENVIO",
+                                            "ERROR PREPARANDO PEDIDO FINAL",
+                                            e
+                                        )
+
+                                        Toast.makeText(
+                                            context,
+                                            mensajeEnvio,
+                                            Toast.LENGTH_LONG
+                                        ).show()
+
+                                    } finally {
+
+                                        enviando =
+                                            false
+                                    }
+                                }
+                            },
+
+                            enabled =
+                                productosPedido.isNotEmpty() &&
+                                        !enviando,
+
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(54.dp)
+                        ) {
+
+                            Text(
+                                text =
+                                    if (
+                                        enviando
+                                    ) {
+                                        "ENVIANDO PEDIDO..."
+                                    } else {
+                                        "ENVIAR PEDIDO"
+                                    },
+
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .titleLarge
+                            )
+                        }
+
+                        if (
+                            mensajeEnvio.isNotBlank()
+                        ) {
+
+                            Spacer(
+                                modifier =
+                                    Modifier.height(12.dp)
+                            )
+
+                            Text(
+                                text =
+                                    mensajeEnvio,
+                                style =
+                                    MaterialTheme
+                                        .typography
+                                        .bodyMedium
+                            )
+                        }
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(24.dp)
+                        )
+                    }
+                }
+                Spacer(
+                    modifier =
+                        Modifier.height(8.dp)
+                )
+
+                Button(
+                    onClick = {
+                        mostrarMenuPedido =
+                            !mostrarMenuPedido
+                    },
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (mostrarMenuPedido) {
+                            "CERRAR MENÚ"
+                        } else {
+                            "ACCIONES DEL PEDIDO"
+                        }
+                    )
+                }
+
+                if (mostrarMenuPedido) {
+
+                    val pedidosHistoricosMenu =
+                        remember {
+                            try {
+                                FlowPedidosHistoricos.cargar(context)
+                            } catch (_: Exception) {
+                                emptyList()
+                            }
+                        }
+
+                    val opcionesHabituales =
+                        productosPedido.mapNotNull { propuesta ->
+
+                            val cantidadesHistoricas =
+                                pedidosHistoricosMenu
+                                    .filter {
+                                        it.idConway == propuesta.idConway
+                                    }
+                                    .map { it.cantidad }
+                                    .filter { it > 0.0 }
+                                    .sorted()
+
+                            if (cantidadesHistoricas.size < 2) {
+                                return@mapNotNull null
+                            }
+
+                            val mitad =
+                                cantidadesHistoricas.size / 2
+
+                            val cantidadHabitual =
+                                if (cantidadesHistoricas.size % 2 == 0) {
+                                    (
+                                            cantidadesHistoricas[mitad - 1] +
+                                                    cantidadesHistoricas[mitad]
+                                            ) / 2.0
+                                } else {
+                                    cantidadesHistoricas[mitad]
+                                }
+
+                            val cantidadActual =
+                                cantidadesRevision[
+                                    propuesta.idVista
+                                ]
+                                    ?.trim()
+                                    ?.toDoubleOrNull()
+                                    ?: (
+                                            propuesta.cantidadSugerida
+                                                ?: 0.0
+                                            )
+
+                            if (
+                                cantidadHabitual <= 0.0 ||
+                                cantidadHabitual == cantidadActual
+                            ) {
+                                return@mapNotNull null
+                            }
+
+                            Triple(
+                                propuesta,
+                                cantidadActual,
+                                cantidadHabitual
+                            )
+                        }
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF181A1F))
+                                .padding(16.dp)
+                    ) {
+
+                        Text(
+                            text = "CANTIDAD HABITUAL",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.White
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(6.dp)
+                        )
+
+                        Text(
+                            text =
+                                "FLOW mantiene su cantidad eficiente. " +
+                                        "Aquí puedes aplicar la cantidad habitual " +
+                                        "de Conway cuando existe histórico suficiente.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF8F96A3)
+                        )
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(12.dp)
+                        )
+
+                        if (opcionesHabituales.isEmpty()) {
+
+                            Text(
+                                text =
+                                    "No hay cantidades habituales diferentes " +
+                                            "con histórico suficiente.",
+                                style =
+                                    MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFFB0B5BE)
+                            )
+
+                        } else {
+
+                            opcionesHabituales.forEach { datos ->
+
+                                val propuesta =
+                                    datos.first
+
+                                val cantidadActual =
+                                    datos.second
+
+                                val cantidadHabitual =
+                                    datos.third
+
+                                Column(
+                                    modifier =
+                                        Modifier.fillMaxWidth()
+                                ) {
+
+                                    Text(
+                                        text = propuesta.producto,
+                                        style =
+                                            MaterialTheme.typography.titleSmall,
+                                        color = Color.White
+                                    )
+
+                                    Spacer(
+                                        modifier =
+                                            Modifier.height(3.dp)
+                                    )
+
+                                    Text(
+                                        text =
+                                            "FLOW: " +
+                                                    formatearCantidadRevision(
+                                                        cantidadActual
+                                                    ) +
+                                                    " " +
+                                                    propuesta.unidadPedidoFlow +
+                                                    " · Habitual: " +
+                                                    formatearCantidadRevision(
+                                                        cantidadHabitual
+                                                    ) +
+                                                    " " +
+                                                    propuesta.unidadPedidoFlow,
+                                        style =
+                                            MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFFB0B5BE)
+                                    )
+
+                                    Spacer(
+                                        modifier =
+                                            Modifier.height(5.dp)
+                                    )
+
+                                    Button(
+                                        onClick = {
+
+                                            cantidadesRevision =
+                                                cantidadesRevision +
+                                                        (
+                                                                propuesta.idVista to
+                                                                        formatearCantidadRevision(
+                                                                            cantidadHabitual
+                                                                        )
+                                                                )
+
+                                            mostrarMenuPedido = false
+                                        },
+                                        modifier =
+                                            Modifier.fillMaxWidth()
+                                    ) {
+                                        Text(
+                                            "USAR HABITUAL · " +
+                                                    formatearCantidadRevision(
+                                                        cantidadHabitual
+                                                    )
+                                        )
+                                    }
+
+                                    Spacer(
+                                        modifier =
+                                            Modifier.height(10.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+            } else if (mostrarPedidoManual) {
+
+                val productosManual =
+                    pedidoSugeridoActual
+                        ?.productos
+                        .orEmpty()
+                        .filter {
+                            it.idConway.isNotBlank() &&
+                                    it.idConway != "-" &&
+                                    it.idConway != "—"
+                        }
+
+                val productosSeleccionadosManual =
+                    productosManual.count { producto ->
+
+                        (
+                                cantidadesPedidoManual[
+                                    producto.idVista
+                                ]
+                                    ?.trim()
+                                    ?.toDoubleOrNull()
+                                    ?: 0.0
+                                ) > 0.0
+                    }
+
+                val listaManualState =
+                    rememberLazyListState()
+
+                Column(
+                    modifier =
+                        Modifier.fillMaxSize()
+                ) {
+
+                    Text(
+                        text = "PEDIDO MANUAL",
+                        style =
+                            MaterialTheme.typography.headlineMedium
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text =
+                            "Elige libremente qué productos quieres pedir.",
+                        style =
+                            MaterialTheme.typography.bodyMedium
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Text(
+                        text =
+                            "Productos seleccionados: " +
+                                    "$productosSeleccionadosManual",
+                        style =
+                            MaterialTheme.typography.titleMedium
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(10.dp)
+                    )
+
+                    LazyColumn(
+                        state =
+                            listaManualState,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                    ) {
+
+                        items(
+                            items = productosManual,
+                            key = { producto ->
+                                producto.idVista
+                            }
+                        ) { producto ->
+
+                            val cantidadActual =
+                                cantidadesPedidoManual[
+                                    producto.idVista
+                                ]
+                                    ?.trim()
+                                    ?.toDoubleOrNull()
+                                    ?: 0.0
+
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            vertical = 6.dp
+                                        )
+                            ) {
+
+                                Row(
+                                    modifier =
+                                        Modifier.fillMaxWidth(),
+                                    verticalAlignment =
+                                        Alignment.CenterVertically
+                                ) {
+
+                                    Column(
+                                        modifier =
+                                            Modifier.weight(1f)
+                                    ) {
+
+                                        Text(
+                                            text =
+                                                producto.producto,
+                                            style =
+                                                MaterialTheme.typography.titleSmall
+                                        )
+
+                                        Spacer(
+                                            modifier =
+                                                Modifier.height(2.dp)
+                                        )
+
+                                        Text(
+                                            text =
+                                                producto.unidadPedidoFlow,
+                                            style =
+                                                MaterialTheme.typography.bodySmall,
+                                            color =
+                                                Color(0xFF8F96A3)
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+
+                                            val nuevaCantidad =
+                                                (
+                                                        cantidadActual - 1.0
+                                                        )
+                                                    .coerceAtLeast(0.0)
+
+                                            cantidadesPedidoManual =
+                                                cantidadesPedidoManual +
+                                                        (
+                                                                producto.idVista to
+                                                                        formatearCantidadRevision(
+                                                                            nuevaCantidad
+                                                                        )
+                                                                )
+                                        }
+                                    ) {
+                                        Text("−")
+                                    }
+
+                                    Text(
+                                        text =
+                                            formatearCantidadRevision(
+                                                cantidadActual
+                                            ),
+                                        style =
+                                            MaterialTheme.typography.titleMedium,
+                                        modifier =
+                                            Modifier.padding(
+                                                horizontal = 10.dp
+                                            )
+                                    )
+
+                                    Button(
+                                        onClick = {
+
+                                            val nuevaCantidad =
+                                                cantidadActual + 1.0
+
+                                            cantidadesPedidoManual =
+                                                cantidadesPedidoManual +
+                                                        (
+                                                                producto.idVista to
+                                                                        formatearCantidadRevision(
+                                                                            nuevaCantidad
+                                                                        )
+                                                                )
+                                        }
+                                    ) {
+                                        Text("+")
+                                    }
+                                }
+
+                                Spacer(
+                                    modifier =
+                                        Modifier.height(4.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Button(
+                        onClick = {
+
+                            if (productosSeleccionadosManual == 0) {
+                                Toast.makeText(
+                                    context,
+                                    "Selecciona al menos un producto",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                return@Button
+                            }
+
+                            if (fechaInformeActual.isBlank()) {
+                                Toast.makeText(
+                                    context,
+                                    "No hay fecha de informe disponible",
+                                    Toast.LENGTH_LONG
+                                ).show()
+
+                                return@Button
+                            }
+
+                            scope.launch {
+
+                                enviando = true
+                                mensajeEnvio =
+                                    "Preparando pedido manual..."
+
+                                try {
+
+                                    val productosParaEnviar =
+                                        productosManual.filter { producto ->
+
+                                            (
+                                                    cantidadesPedidoManual[
+                                                        producto.idVista
+                                                    ]
+                                                        ?.trim()
+                                                        ?.toDoubleOrNull()
+                                                        ?: 0.0
+                                                    ) > 0.0
+                                        }
+
+                                    val pedidoFinal =
+                                        FlowPedidoFinal.crear(
+                                            productos =
+                                                productosParaEnviar,
+                                            cantidades =
+                                                cantidadesPedidoManual
+                                        )
+
+                                    Log.d(
+                                        "FLOW ENVIO",
+                                        "PEDIDO MANUAL preparado - " +
+                                                "líneas=" +
+                                                pedidoFinal.lineas.size
+                                    )
+
+                                    withContext(
+                                        Dispatchers.IO
+                                    ) {
+
+                                        FlowPedidoFinal.guardar(
+                                            context =
+                                                context,
+                                            pedido =
+                                                pedidoFinal
+                                        )
+                                    }
+
+                                    mensajeEnvio =
+                                        "Generando PDF pedido manual..."
+
+                                    val resultadoPdf =
+                                        withContext(
+                                            Dispatchers.IO
+                                        ) {
+
+                                            FlowPdfPedidoFinal.generar(
+                                                context =
+                                                    context,
+                                                archivoOriginal =
+                                                    File(
+                                                        context.cacheDir,
+                                                        "flow_informe.pdf"
+                                                    ),
+                                                pedidoFinal =
+                                                    pedidoFinal
+                                            )
+                                        }
+
+                                    Log.d(
+                                        "FLOW ENVIO",
+                                        "PDF MANUAL OK - " +
+                                                "archivo=" +
+                                                resultadoPdf.archivo.absolutePath +
+                                                " | líneas=" +
+                                                resultadoPdf.lineasEscritas
+                                    )
+
+                                    mensajeEnvio =
+                                        "Enviando " +
+                                                "${pedidoFinal.lineas.size} línea(s) " +
+                                                "a CineStock Windows..."
+
+                                    val resultadoEnvio =
+                                        FlowPedidoEnvio.enviar(
+                                            context =
+                                                context,
+                                            pedido =
+                                                pedidoFinal,
+                                            fechaInforme =
+                                                fechaInformeActual,
+                                            archivoPdf =
+                                                resultadoPdf.archivo
+                                        )
+
+                                    if (resultadoEnvio.ok) {
+
+                                        mensajeEnvio =
+                                            resultadoEnvio.mensaje +
+                                                    " OrderId: " +
+                                                    resultadoEnvio.orderId
+
+                                        Toast.makeText(
+                                            context,
+                                            "Pedido manual enviado correctamente",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+
+                                        Log.d(
+                                            "FLOW ENVIO",
+                                            "ENVÍO MANUAL OK - " +
+                                                    "líneas=" +
+                                                    pedidoFinal.lineas.size +
+                                                    " | orderId=" +
+                                                    resultadoEnvio.orderId
+                                        )
+
+                                    } else {
+
+                                        mensajeEnvio =
+                                            resultadoEnvio.mensaje
+
+                                        Toast.makeText(
+                                            context,
+                                            mensajeEnvio,
+                                            Toast.LENGTH_LONG
+                                        ).show()
+
+                                        Log.e(
+                                            "FLOW ENVIO",
+                                            "ENVÍO MANUAL ERROR - " +
+                                                    resultadoEnvio.mensaje +
+                                                    " | respuesta=" +
+                                                    resultadoEnvio.cuerpoRespuesta
+                                        )
+                                    }
+
+                                } catch (e: Exception) {
+
+                                    mensajeEnvio =
+                                        "Error preparando el pedido manual: " +
+                                                (
+                                                        e.message
+                                                            ?: e.javaClass.simpleName
+                                                        )
+
+                                    Log.e(
+                                        "FLOW ENVIO",
+                                        "ERROR PEDIDO MANUAL",
+                                        e
+                                    )
+
+                                    Toast.makeText(
+                                        context,
+                                        mensajeEnvio,
+                                        Toast.LENGTH_LONG
+                                    ).show()
+
+                                } finally {
+
+                                    enviando = false
+                                }
+                            }
+                        },
+                        enabled =
+                            productosSeleccionadosManual > 0 &&
+                                    !enviando,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                    ) {
+                        Text(
+                            text =
+                                if (enviando) {
+                                    "ENVIANDO PEDIDO..."
+                                } else {
+                                    "ENVIAR PEDIDO MANUAL"
+                                },
+                            style =
+                                MaterialTheme.typography.titleLarge
+                        )
+                    }
+
+                    if (mensajeEnvio.isNotBlank()) {
+
+                        Spacer(
+                            modifier =
+                                Modifier.height(10.dp)
+                        )
+
+                        Text(
+                            text =
+                                mensajeEnvio,
+                            style =
+                                MaterialTheme.typography.bodyMedium
+                        )
+                    }
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(8.dp)
+                    )
+
+                    Button(
+                        onClick = {
+
+                            mostrarPedidoManual = false
+
+                            Log.d(
+                                "FLOW PEDIDO",
+                                "PEDIDO MANUAL cerrado - " +
+                                        "líneas seleccionadas=" +
+                                        productosSeleccionadosManual
+                            )
+                        },
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    ) {
+                        Text("VOLVER")
+                    }
+                }
+
+            } else {
+
+                Spacer(
+                    modifier =
+                        Modifier.height(6.dp)
+                )
+
+                Text(
+                    text = "TU CINE. TU FLOW.",
+                    style =
+                        MaterialTheme
+                            .typography
+                            .titleMedium
+                )
+                Spacer(
+                    modifier =
+                        Modifier.height(10.dp)
+                )
+
+                Image(
+                    painter =
+                        painterResource(
+                            id = R.drawable.flow_gato
+                        ),
+
+                    contentDescription =
+                        "FLOW",
+
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(230.dp),
+
+                    contentScale =
+                        ContentScale.Fit
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(10.dp)
+                )
+                Spacer(
+                    modifier =
+                        Modifier.height(20.dp)
+                )
+
+                Button(
+                    onClick = {
+
+                        selectorPDF.launch(
+                            arrayOf(
+                                "application/pdf"
+                            )
+                        )
+                    },
+
+                    modifier =
+                        Modifier.fillMaxWidth()
+                ) {
+
+                    Text(
+                        "STOCK / INFORME"
+                    )
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                /* Button(
+                     onClick = {
+                         Toast.makeText(
+                             context,
+                             "BOTÓN PDF PULSADO",
+                             Toast.LENGTH_SHORT
+                         ).show()
+
+                         val archivoOriginal =
+                             File(
+                                 context.cacheDir,
+                                 "flow_informe.pdf"
+                             )
+                         Toast.makeText(
+                             context,
+                             if (archivoOriginal.exists()) {
+                                 "PDF ENCONTRADO"
+                             } else {
+                                 "PDF NO ENCONTRADO"
+                             },
+                             Toast.LENGTH_SHORT
+                         ).show()
+
+                         if (!archivoOriginal.exists()) {
+
+                             mensajePruebaPdf =
+                                 "Primero carga un informe."
+
+                             return@Button
+                         }
+
+                         scope.launch {
+
+                             mensajePruebaPdf =
+                                 "Ejecutando prueba PDF..."
+
+                             try {
+
+                                 Toast.makeText(
+                                     context,
+                                     "ENTRANDO EN PRUEBA PDF",
+                                     Toast.LENGTH_SHORT
+                                 ).show()
+
+                                 val resultado =
+                                     withContext(
+                                         Dispatchers.IO
+                                     ) {
+
+                                         FlowPdfPedidoFinalPrueba.ejecutar(
+                                             context
+                                         )
+                                     }
+
+                                 Toast.makeText(
+                                     context,
+                                     "PRUEBA PDF TERMINADA",
+                                     Toast.LENGTH_SHORT
+                                 ).show()
+
+                                 mensajePruebaPdf =
+                                     "PRUEBA OK · líneas escritas: " +
+                                             resultado.lineasEscritas
+
+                                 Log.d(
+                                     "FLOW PDF PRUEBA",
+                                     "PRUEBA OK - archivo=" +
+                                             resultado.archivo.absolutePath +
+                                             " | líneas=" +
+                                             resultado.lineasEscritas +
+                                             " | familiasPendientes=" +
+                                             resultado.familiasPendientes
+                                 )
+
+                             } catch (
+                                 e: Exception
+                             ) {
+
+                                 mensajePruebaPdf =
+                                     "ERROR: " +
+                                             (
+                                                     e.message
+                                                         ?: e.javaClass.simpleName
+                                                     )
+
+                                 Log.e(
+                                     "FLOW PDF PRUEBA",
+                                     "ERROR EN PRUEBA",
+                                     e
+                                 )
+                             }
+                         }
+                     },
+
+                     enabled =
+                         paginasPDF.isNotEmpty(),
+
+                     modifier =
+                         Modifier.fillMaxWidth()
+                 ) {
+
+                     Text(
+                         "PRUEBA PDF FINAL"
+                     )
+                 }*/
+
+
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                Text(
+                    text =
+                        estado,
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodyMedium
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                if (
+                    paginasPDF.isNotEmpty()
+                ) {
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
+                                .verticalScroll(
+                                    rememberScrollState()
+                                ),
+
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
+                    ) {
+
+                        paginasPDF.forEachIndexed {
+                                indice,
+                                bitmap ->
+
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(
+                                            bottom = 12.dp
+                                        )
+                                        .background(
+                                            Color.White
+                                        ),
+
+                                contentAlignment =
+                                    Alignment.Center
+                            ) {
+
+                                Image(
+                                    bitmap =
+                                        bitmap
+                                            .asImageBitmap(),
+
+                                    contentDescription =
+                                        "Página ${indice + 1}",
+
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .widthIn(
+                                                max = 900.dp
+                                            ),
+
+                                    contentScale =
+                                        ContentScale.FillWidth
+                                )
+                            }
+                        }
+                    }
+
+                } else {
+
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+
+                        Text(
+                            text =
+                                "Aquí aparecerá el informe completo.",
+
+                            style =
+                                MaterialTheme
+                                    .typography
+                                    .bodyLarge
+                        )
+                    }
+                }
+
+                Spacer(
+                    modifier =
+                        Modifier.height(12.dp)
+                )
+
+                Spacer(
+                    modifier =
+                        Modifier.height(8.dp)
+                )
+
+                Text(
+                    text =
+                        "CineStock Windows: " +
+                                "$ipCineStock:$puertoCineStock",
+
+                    style =
+                        MaterialTheme
+                            .typography
+                            .bodySmall
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FlowBottomBarItem(
+    label: String,
+    contentDescription: String,
+    icon: @Composable () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Box(
+            modifier = Modifier.height(34.dp).width(40.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            icon()
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall
+        )
+    }
+}
+
+@Composable
+private fun FlowPackageIcon() {
+    Canvas(modifier = Modifier.width(32.dp).height(32.dp)) {
+        val s = 2.2f
+        drawRoundRect(
+            color = Color.White,
+            topLeft = androidx.compose.ui.geometry.Offset(5f, 9f),
+            size = androidx.compose.ui.geometry.Size(22f, 17f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = s)
+        )
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(5f, 13f), androidx.compose.ui.geometry.Offset(27f, 13f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(16f, 9f), androidx.compose.ui.geometry.Offset(16f, 26f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(8f, 6f), androidx.compose.ui.geometry.Offset(16f, 10f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(24f, 6f), androidx.compose.ui.geometry.Offset(16f, 10f), s)
+    }
+}
+
+@Composable
+private fun FlowClipboardIcon() {
+    Canvas(modifier = Modifier.width(32.dp).height(32.dp)) {
+        val s = 2.0f
+        drawRoundRect(
+            color = Color.White,
+            topLeft = androidx.compose.ui.geometry.Offset(7f, 6f),
+            size = androidx.compose.ui.geometry.Size(18f, 22f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f, 3f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = s)
+        )
+        drawRoundRect(
+            color = Color.White,
+            topLeft = androidx.compose.ui.geometry.Offset(11f, 3f),
+            size = androidx.compose.ui.geometry.Size(10f, 6f),
+            cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f),
+            style = androidx.compose.ui.graphics.drawscope.Stroke(width = s)
+        )
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(11f, 12f), androidx.compose.ui.geometry.Offset(21f, 12f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(11f, 16f), androidx.compose.ui.geometry.Offset(21f, 16f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(11f, 20f), androidx.compose.ui.geometry.Offset(18f, 20f), s)
+    }
+}
+
+@Composable
+private fun FlowGearIcon() {
+    Canvas(modifier = Modifier.width(32.dp).height(32.dp)) {
+        val center = androidx.compose.ui.geometry.Offset(16f, 16f)
+        val s = 2.0f
+        drawCircle(Color.White, radius = 9f, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(width = s))
+        drawCircle(Color.White, radius = 3f, center = center)
+        val r1 = 10f
+        val r2 = 14f
+        val c = 16f
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c, c-r1), androidx.compose.ui.geometry.Offset(c, c-r2), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c, c+r1), androidx.compose.ui.geometry.Offset(c, c+r2), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c-r1, c), androidx.compose.ui.geometry.Offset(c-r2, c), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c+r1, c), androidx.compose.ui.geometry.Offset(c+r2, c), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c-7f, c-7f), androidx.compose.ui.geometry.Offset(c-10f, c-10f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c+7f, c+7f), androidx.compose.ui.geometry.Offset(c+10f, c+10f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c+7f, c-7f), androidx.compose.ui.geometry.Offset(c+10f, c-10f), s)
+        drawLine(Color.White, androidx.compose.ui.geometry.Offset(c-7f, c+7f), androidx.compose.ui.geometry.Offset(c-10f, c+10f), s)
+    }
+}
+
+
+private fun leerCampoIdNumericoComoTexto(
+    objeto: JSONObject,
+    clave: String
+): String {
+
+    val valor =
+        objeto.opt(clave)
+            ?: return ""
+
+    return when (valor) {
+
+        is Number ->
+            BigDecimal(
+                valor.toString()
+            )
+                .toPlainString()
+                .removeSuffix(".0")
+
+        else ->
+            valor.toString().trim()
+    }
+}
+
+private fun crearSugerenciaVisualNoPropuesta(
+    producto: ProductoFlow,
+    propuesta: PropuestaPedido?
+): OrderSuggestion {
+
+    return OrderSuggestion(
+        idVista = producto.idVista,
+        producto = producto.producto,
+        idErp = producto.idErp,
+        umErp = producto.umErp,
+        idConway = producto.idConway,
+        denominacionLargaConway = producto.denominacionLargaConway,
+        presentacion = producto.presentacion,
+        unidadesPorCajaPack = producto.unidadesPorCajaPack,
+        unidadPedidoFlow = producto.unidadPedidoFlow,
+        estado = propuesta?.estado ?: "SIN ANALISIS",
+        fuente = producto.fuente,
+        notaRegla = producto.notaRegla,
+        debeRevisarse = propuesta?.necesitaRevision ?: false,
+        cantidadSugerida = 0.0,
+        nivelEvidencia =
+            propuesta?.nivelEvidencia ?: "DESCONOCIDO",
+        numeroEpisodios = 0,
+        consumoMedio = null,
+        stockActualRegistrado = producto.stockFinal,
+        motivo =
+            propuesta?.motivo
+                ?: "No existe una propuesta automática activa para este producto."
+    )
+}
+
+private fun claveVarianteFamiliaRevision(
+    linea: LineaPedidoFamiliaFlow
+): String {
+
+    return when {
+
+        linea.idErp.isNotBlank() ->
+            "F|${linea.idVistaFamilia}|ERP|${linea.idErp}|UM|${linea.umErp}"
+
+        linea.idConway.isNotBlank() &&
+                linea.idConway != "-" &&
+                linea.idConway != "—" ->
+            "F|${linea.idVistaFamilia}|CONWAY|${linea.idConway}"
+
+        else ->
+            "F|${linea.idVistaFamilia}|PRODUCTO|${linea.producto.trim().uppercase()}"
+    }
+}
+
+fun formatearCantidadRevision(
+    cantidad: Double?
+): String {
+
+    if (
+        cantidad == null
+    ) {
+        return ""
+    }
+
+    return BigDecimal
+        .valueOf(cantidad)
+        .stripTrailingZeros()
+        .toPlainString()
+}
+
+fun extraerFechaInicioInforme(
+    texto: String
+): String {
+
+    val patron =
+        Regex(
+            """From:\s+[^,]+,\s+(\d{2}/\d{2}/\d{4})\s+\d{2}:\d{2}"""
+        )
+
+    val coincidencia =
+        patron.find(texto)
+            ?: throw IllegalStateException(
+                "No se pudo encontrar la fecha de inicio del informe."
+            )
+
+    return coincidencia.groupValues[1]
+}
